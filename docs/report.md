@@ -29,7 +29,7 @@ Auvik [3] is a network monitoring platform that focuses on the live state of the
 CoreDNS is a lightweight Go based DNS server. The software is modularized into plugins, so users can choose different plugins based on individual use cases, which keeps CPU usage low. CoreDNS is open source and containerized, so it can be easily deployed with minimal set up time. Our product will strive to be similar to coreDNS, but with a few added features such as an administrative dashbaord and network monitoring. The architecture of our product is especially similar to CoreDNS, becasue our software will be written in Go and deployable in a Docker container. 
 
 ## Bibliography
-[1] SolarWinds - https://www.solarwinds.com/ip-address-manager/
-[2] Infoblox - https://www.infoblox.com/solutions/
-[3] Auvik - https://www.auvik.com/network-management-software/network-mapping-software/
-[4] CoreDNS  - https://coredns.io/?utm_source=gemini
+[1] SolarWinds - https://www.solarwinds.com/ip-address-manager/  
+[2] Infoblox - https://www.infoblox.com/solutions/  
+[3] Auvik - https://www.auvik.com/network-management-software/network-mapping-software/  
+[4] CoreDNS  - https://coredns.io/?utm_source=gemini  
