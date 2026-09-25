@@ -1,12 +1,24 @@
 # Cover Page
 
+![Frontline DNS Logo](FrontlineDNSLogo.png)
+Team Members: Cole Amacker, Tim Heiser, Veronica Rine, 
+James Yoho, Isaiah Zimmerman
+
+September 24<sup>th</sup>, 2026
+
 ## Introduction
 
 ### Purpose of the System
 
+The military controls numerous devices connected to closed networks. Since they are on closed networks, users use outdated methods to map IPs to device names and track IP address ranges on applications not designed for DNS, such as Microsoft Excel. The purpose of this system is to upgrade their network management tools through a gradual migration.
+
 ### Target Users
 
+The target users are TurbineOne employees who are setting up IT systems in various locations and military personnel who are collaborating with the TurbineOne employees.
+
 ### Main Features
+
+The main features are DNS functionality, an admin dashboard, and device health check capabilities. The DNS functionality will allow users to track IPv4s, IPv6s, and domain names through a dedicated application, and allow for importing and exporting to and from Excel to ease the software migration. The admin dashboard enables management of importing and exporting from Excel, user management, and review and editing of device adding requests submitted by users. The device health check capabilities let admins track network status and review logs of previously documented issues.
 
 ## Representative Tasks
 
