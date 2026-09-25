@@ -10,6 +10,24 @@
 
 ## Representative Tasks
 
+### 1: Health Checks - Unsolved Failure
+Matt, a senior field engineer at T1, is monitoring the health of a military base's network hosted on f-dns. When he checks on the network status, he immediately sees that a high value server is down on the network. Matt immediately sends a ping to the server to try and diagnose the problem, and recieves no response. He knows there are engineers assigned to maintain this device, and pulls up the metadata of the server to check who is responsible.
+
+In the metadata, he sees that the server has been down for more than 15 minutes, and that Tim and Cole are the engineers assigned to this part of the network. According to the metadata, Tim has been alerted, but neither employee has responded. Matt immediately sends an alert to both engineers. Cole acknowledges the alert and begins working on diagnosing and fixing the issue.
+
+### 2: Health Checks - Diagnosing and Fixing
+James, a field engineer onsite at a military base, recives a notification by text that a datacenter on the network he is assigned to is down. He quickly pings the server, and is able to diagnose the issue. After resetting the datacenter, the metadata is updated, recording the downtime, as well as James' ping request, diagnosis, and reset of the server.
+
+### 3: Health Checks - Analyzing Uptime
+Matt has had some concerns about the uptime of the datacenter that James just fixed in the previous task. He pulls up the metadata of the datacenter to look at its statistics, seeing the recent outage, as well as James' fix. Included in the metadata is an uptime report, showing that the datacenter has only been able to maintain about 90% uptime, which is much lower than expected. Matt is then able to use this data to assess if the datacenter needs to be replaced or updated.
+
+### 4: Health Checks - Topology Analysis
+Tim is a senior field engineer in charge of a large military base network, who recieves notifications for a large part of the network going down suddenly. To diagnose what might be causing a problem for such a large chunk of the network, he pulls up the automatically generated topology map for the network.
+
+After pulling up the topology map, Tim notices that all the devices that are down are part of one subnetwork, all routing through a single router that is also down. Tim sends a ping to this router, and gets no response, realizing that this is the likely failure point. Tim then checks the metadata to see what engineers are responsible for this part of the network. He sends notifications to James and Veronica, and they rush to diagnose and fix the issue.
+
+
+
 ## Related Work
 
 ### Product 1 - SolarWinds
