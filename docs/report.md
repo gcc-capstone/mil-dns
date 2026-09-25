@@ -8,18 +8,9 @@ James Yoho, Isaiah Zimmerman
 September 24<sup>th</sup>, 2026
 
 ## Introduction
+The military operates a large number of devices on closed, air-gapped networks. Because these environments cannot reach external infrastructure, the software used often lags behind the commercial industry and hostname mappings are often scattered in excel spreadsheets. Additionally, the air-gapped networks often block standard broadcast discovery protocols, which can make it harder to keep track of the health of a network. Our platform will work within these constraints to upgrade the outdated systems that are currently in place.
 
-### Purpose of the System
-
-The military controls numerous devices connected to closed networks. Since they are on closed networks, users use outdated methods to map IPs to device names and track IP address ranges on applications not designed for DNS, such as Microsoft Excel. The purpose of this system is to upgrade their network management tools through a gradual migration.
-
-### Target Users
-
-The target users are TurbineOne employees who are setting up IT systems in various locations and military personnel who are collaborating with the TurbineOne employees.
-
-### Main Features
-
-The main features are DNS functionality, an admin dashboard, and device health check capabilities. The DNS functionality will allow users to track IPv4s, IPv6s, and domain names through a dedicated application, and allow for importing and exporting to and from Excel to ease the software migration. The admin dashboard enables management of importing and exporting from Excel, user management, and review and editing of device adding requests submitted by users. The device health check capabilities let admins track network status and review logs of previously documented issues.
+Our platform replaces manual tracking by giving TurbineOne engineers and military personnel an integrated, locally hosted DNS and network management tool. The application pairs authoritative local DNS resolution for both IPv4 and transitional IPv6 allocations with bidirectional Excel import and export utilities to ease migration. Through a centralized web dashboard, administrators can manage user access across segmented subnetworks, review and approve device registration requests, and maintain clear records of device ownership. To support day-to-day operations in constrained environments, the software also provides active reachability testing, node health checks, and persistent metadata logging, giving field teams immediate visibility into device connectivity and hardware status without external dependencies.
 
 ## Representative Tasks
 
