@@ -13,6 +13,7 @@ The military operates a large number of devices on closed, air-gapped networks. 
 Our platform replaces manual tracking by giving TurbineOne engineers and military personnel an integrated, locally hosted DNS and network management tool. The application pairs authoritative local DNS resolution for both IPv4 and transitional IPv6 allocations with bidirectional Excel import and export utilities to ease migration. Through a centralized web dashboard, administrators can manage user access across segmented subnetworks, review and approve device registration requests, and maintain clear records of device ownership. To support day-to-day operations in constrained environments, the software also provides active reachability testing, node health checks, and persistent metadata logging, giving field teams immediate visibility into device connectivity and hardware status without external dependencies.
 
 ## Representative Tasks
+The list of tasks below is intended to give a sample of what types of use cases our platform will have. We hope that the list is thorough, but it is not meant to be a comprehensive technical list of tasks.  
 
 ### 1: Health Checks - Unsolved Failure
 Matt, a senior field engineer at T1, is monitoring the health of a military base's network hosted on f-dns. When he checks on the network status, he immediately sees that a high value server is down on the network. Matt immediately sends a ping to the server to try and diagnose the problem, and recieves no response. He knows there are engineers assigned to maintain this device, and pulls up the metadata of the server to check who is responsible.
@@ -43,6 +44,7 @@ Veronica, a field engineer at T1, needs to add a laptop to a subnetwork she over
 Matt has recieved a notification that Veronica has requested to add a laptop. From the notification, he pulls up the request. Upon review of the request, he notices some of the metadata on the laptop Veronica wants to add is incorrect. He then edits the incorrect metadata, approving the request after the change is made. The changes go through and the network is updated.
 
 ## Related Work
+We believe that our product can be of greater use to TurbineOne than any existing open-source product, but many similar products already do exist. This section will give an overview of similar products and show how our product will be a unique combination of features from various existing products. 
 
 ### Product 1 - SolarWinds
 SolarWinds [1] is an IP address manager that provides much of the same functionality we are looking to build in our own product. SolarWinds is designed as a modern alternative to keeping IP and DNS information in spreadsheets that can become difficult to manage at larger scales. It provides a user interface that allows network administrators to look at available IP addresses and monitor the status and usage of active addresses. Additionally, SolarWinds actively scans networks in order to perform health checks and record various pieces of metadata about network devices. 
