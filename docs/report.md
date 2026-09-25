@@ -1,6 +1,7 @@
 # Cover Page
 
 ![Frontline DNS Logo](FrontlineDNSLogo.png)
+
 Team Members: Cole Amacker, Tim Heiser, Veronica Rine, 
 James Yoho, Isaiah Zimmerman
 
@@ -28,7 +29,7 @@ Matt, a senior field engineer at T1, is monitoring the health of a military base
 In the metadata, he sees that the server has been down for more than 15 minutes, and that Tim and Cole are the engineers assigned to this part of the network. According to the metadata, Tim has been alerted, but neither employee has responded. Matt immediately sends an alert to both engineers. Cole acknowledges the alert and begins working on diagnosing and fixing the issue.
 
 ### 2: Health Checks - Diagnosing and Fixing
-James, a field engineer onsite at a military base, recives a notification by text that a datacenter on the network he is assigned to is down. He quickly pings the server, and is able to diagnose the issue. After resetting the datacenter, the metadata is updated, recording the downtime, as well as James' ping request, diagnosis, and reset of the server.
+James, a field engineer onsite at a military base, receives a notification by text that a datacenter on the network he is assigned to is down. He quickly pings the server, and is able to diagnose the issue. After resetting the datacenter, the metadata is updated, recording the downtime, as well as James' ping request, diagnosis, and reset of the server.
 
 ### 3: Health Checks - Analyzing Uptime
 Matt has had some concerns about the uptime of the datacenter that James just fixed in the previous task. He pulls up the metadata of the datacenter to look at its statistics, seeing the recent outage, as well as James' fix. Included in the metadata is an uptime report, showing that the datacenter has only been able to maintain about 90% uptime, which is much lower than expected. Matt is then able to use this data to assess if the datacenter needs to be replaced or updated.
