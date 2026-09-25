@@ -30,7 +30,17 @@ Tim is a senior field engineer in charge of a large military base network, who r
 
 After pulling up the topology map, Tim notices that all the devices that are down are part of one subnetwork, all routing through a single router that is also down. Tim sends a ping to this router, and gets no response, realizing that this is the likely failure point. Tim then checks the metadata to see what engineers are responsible for this part of the network. He sends notifications to James and Veronica, and they rush to diagnose and fix the issue.
 
+### 5: Admin Dashboard - Excel Upload
+Matt is an admin working on setting up a new subnetwork for a military base in California. He has a list of all the devices that need to be added to the subnetwork, but they are in the military’s standard Excel spreadsheet format. Matt uploads the Excel sheet of devices he has to f-dns. The f-dns application then automatically takes this data and uses it to generate the subnetwork to a DNS server or servers with all of the devices in the dataset, tracking each device’s IP, assigning each a domain name, and attaching all provided metadata. The subnetwork is then ready for use and for user/employee accounts to be added.
 
+### 6: Admin Dashboard - Excel Export
+James must present to his team information on the devices in his subnetwork. Using f-dns, he exports the devices, their IP addresses, and their metadata to an Excel spreadsheet, deselecting any devices he does not want in the report. He now has an Excel spreadsheet with all the device data he needs which he can use to generate charts and tables for his presentation.
+
+### 7: Admin Dashboard - Network Update
+Veronica, a field engineer at T1, needs to add a laptop to a subnetwork she oversees at a military base. She has the IPv4, planned domain name, and a couple pieces of metadata information that need to be attached to the device on the network. With this information she opens a request to add the device to the network, manually putting in its details. She submits the request, which then sends a notification to Matt, her admin.
+
+### 8: Admin Dashboard - Admin Approval
+Matt has recieved a notification that Veronica has requested to add a laptop. From the notification, he pulls up the request. Upon review of the request, he notices some of the metadata on the laptop Veronica wants to add is incorrect. He then edits the incorrect metadata, approving the request after the change is made. The changes go through and the network is updated.
 
 ## Related Work
 
