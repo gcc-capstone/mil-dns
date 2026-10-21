@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   addEvent,
+  DEFAULT_NETWORKS,
   fields,
   labels,
   initialState,
@@ -11,13 +12,26 @@ import {
   type Draft,
   type State,
   type Status,
+  type Ticket,
 } from "./model";
-const STORAGE = "fdns-react-demo-v1";
+
+const STORAGE = "fdns-react-demo-v2";
+
 const url = (page: string, network?: string) =>
   `#/${page}${network ? "?network=" + encodeURIComponent(network) : ""}`;
 const detailUrl = (id: number, tab = "overview") =>
   `#/devices/${id}?tab=${tab}`;
-const statuses: Status[] = ["Online", "Down", "Degraded", "Unknown"];
+const statuses: Status[] = ["Online", "Offline", "Online-Open-Ticket", "Unknown"];
+
+function getClassificationClass(networkName: string) {
+  const norm = networkName.trim().toLowerCase();
+  if (norm.includes("top secret")) return "top-secret";
+  if (norm.includes("secret")) return "secret";
+  if (norm.includes("confidential")) return "confidential";
+  if (norm.includes("unclassified")) return "unclassified";
+  return "unclassified";
+}
+
 function Badge({ value }: { value: Status }) {
   return (
     <span className={"status " + value.toLowerCase()}>
@@ -26,6 +40,7 @@ function Badge({ value }: { value: Status }) {
     </span>
   );
 }
+
 function Heading({
   eyebrow,
   title,
@@ -48,6 +63,7 @@ function Heading({
     </div>
   );
 }
+
 function Panel({
   title,
   aside,
@@ -67,11 +83,12 @@ function Panel({
     </section>
   );
 }
+
 function getStored(): State {
   try {
     const data = JSON.parse(localStorage.getItem(STORAGE) || "null");
     if (
-      data?.version === 1 &&
+      data?.version === 2 &&
       Array.isArray(data.devices) &&
       Array.isArray(data.events) &&
       Array.isArray(data.alerts)
@@ -82,11 +99,13 @@ function getStored(): State {
   }
   return initialState();
 }
+
 export default function App() {
   const [state, setState] = useState<State>(getStored);
   const [hash, setHash] = useState(location.hash || "#/");
   const [flash, setFlash] = useState("");
   const [saveError, setSaveError] = useState("");
+
   useEffect(() => {
     const listener = () => {
       setHash(location.hash || "#/");
@@ -96,6 +115,7 @@ export default function App() {
     window.addEventListener("hashchange", listener);
     return () => window.removeEventListener("hashchange", listener);
   }, []);
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE, JSON.stringify(state));
@@ -106,10 +126,27 @@ export default function App() {
       );
     }
   }, [state]);
+
   const [path, query = ""] = hash.slice(1).split("?");
   const params = new URLSearchParams(query);
-  const network = params.get("network") || "Base Alpha";
-  const networks = [...new Set(state.devices.map((d) => d.network))].sort();
+
+  const networks = [
+    ...new Set([...DEFAULT_NETWORKS, ...state.devices.map((d) => d.network)]),
+  ].sort((a, b) => {
+    const ia = DEFAULT_NETWORKS.indexOf(
+      a as (typeof DEFAULT_NETWORKS)[number],
+    );
+    const ib = DEFAULT_NETWORKS.indexOf(
+      b as (typeof DEFAULT_NETWORKS)[number],
+    );
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  const network = params.get("network") || networks[0] || "Unclassified";
+
   const page = path.startsWith("/devices")
     ? "devices"
     : path === "/topology"
@@ -117,6 +154,7 @@ export default function App() {
       : path === "/import"
         ? "import"
         : "home";
+
   const d = state.devices.find((d) => path === `/devices/${d.id}`);
   const title = d
     ? d.name
@@ -129,25 +167,33 @@ export default function App() {
           : page === "import"
             ? "Import inventory"
             : "Operations overview";
+
   useEffect(() => {
     document.title = title + " · f-dns";
   }, [title]);
-  const alertCount = state.alerts.filter((a) => !a.acknowledged).length;
+
+  const openTicketCount = state.alerts.filter((t) => !t.resolved).length;
+
   function tabs(endpoint: string) {
     return (
       <nav className="network-tabs" aria-label="Networks">
-        {networks.map((n) => (
-          <a
-            key={n}
-            className={n === network ? "selected" : ""}
-            href={url(endpoint, n)}
-          >
-            {n} <span>↗</span>
-          </a>
-        ))}
+        {networks.map((n) => {
+          const classSlug = getClassificationClass(n);
+          return (
+            <a
+              key={n}
+              className={`${n === network ? "selected" : ""} net-${classSlug}`}
+              href={url(endpoint, n)}
+            >
+              <span className="tab-dot" aria-hidden="true" />
+              {n} <span>↗</span>
+            </a>
+          );
+        })}
       </nav>
     );
   }
+
   function action(kind: string, device: Device, note = "") {
     let next = state;
     let message = "";
@@ -170,7 +216,7 @@ export default function App() {
       next = addEvent(state, device.id, "Engineer note · Matt", note.trim());
     }
     if (kind === "resolve") {
-      message = "Device marked online in the demo.";
+      message = "Device marked online and open tickets resolved.";
       next = addEvent(
         {
           ...state,
@@ -179,8 +225,8 @@ export default function App() {
               ? { ...d, status: "Online", error: "", downtime: "—" }
               : d,
           ),
-          alerts: state.alerts.map((a) =>
-            a.deviceId === device.id ? { ...a, acknowledged: true } : a,
+          alerts: state.alerts.map((t) =>
+            t.deviceId === device.id ? { ...t, resolved: true } : t,
           ),
         },
         device.id,
@@ -194,6 +240,7 @@ export default function App() {
     setHash(nextHash);
     setFlash(message);
   }
+
   function timeline(events: State["events"], compact = false) {
     return (
       <div className={"timeline " + (compact ? "compact" : "")}>
@@ -216,15 +263,17 @@ export default function App() {
       </div>
     );
   }
+
   const inventory = state.devices.filter((d) => d.network === network);
   let content: ReactNode;
+
   if (path === "/" || path === "")
     content = (
       <>
         <Heading
           eyebrow="NETWORK OPERATIONS"
           title="Operations overview"
-          description="Your networks at a glance. Prioritize issues and keep teams informed."
+          description="Your networks at a glance. Track engineer tickets and monitor network inventory."
         >
           <a className="button primary" href={url("devices")}>
             View devices ↗
@@ -243,69 +292,75 @@ export default function App() {
               "Responding normally",
             ],
             [
-              "Down",
-              state.devices.filter((d) => d.status === "Down").length,
-              "Requires investigation",
-            ],
-            [
-              "Degraded / unknown",
-              state.devices.filter((d) =>
-                ["Degraded", "Unknown"].includes(d.status),
-              ).length,
-              "Review health checks",
+              "Open tickets",
+              openTicketCount,
+              "Assigned to network engineers",
             ],
           ].map(([name, count, note]) => (
             <article key={name}>
               <span>{name}</span>
-              <strong className={name === "Down" ? "red-text" : ""}>
-                {count}
-              </strong>
+              <strong>{count}</strong>
               <small>{note}</small>
             </article>
           ))}
         </div>
         <div className="overview-grid">
           <Panel
-            title="Attention required"
-            aside={<span className="count">{alertCount}</span>}
+            title="Open tickets"
+            aside={<span className="count">{openTicketCount}</span>}
           >
             <div id="alerts">
               {[...state.alerts]
-                .sort((a, b) => Number(a.acknowledged) - Number(b.acknowledged))
-                .map((a) => {
-                  const d = state.devices.find((d) => d.id === a.deviceId)!;
+                .sort((a, b) => Number(a.resolved) - Number(b.resolved))
+                .map((t) => {
+                  const dev = state.devices.find((d) => d.id === t.deviceId);
+                  if (!dev) return null;
                   return (
                     <article
-                      key={a.id}
+                      key={t.id}
                       className={
-                        "alert-card " + (a.acknowledged ? "acknowledged" : "")
+                        "alert-card " + (t.resolved ? "acknowledged" : "")
                       }
                     >
-                      <div className={"alert-icon " + a.severity.toLowerCase()}>
-                        !
+                      <div
+                        className={
+                          "alert-icon " +
+                          (t.priority === "Normal" ? "warning" : "")
+                        }
+                      >
+                        #
                       </div>
                       <div className="alert-body">
                         <div className="alert-top">
                           <span
-                            className={"severity " + a.severity.toLowerCase()}
+                            className={
+                              "severity " +
+                              (t.priority === "Normal" ? "warning" : "")
+                            }
                           >
-                            {a.severity}
+                            Ticket #{t.id} · {t.priority} priority
                           </span>
-                          <span className="muted">{d.network}</span>
+                          <span className="muted">{dev.network}</span>
                         </div>
                         <h3>
-                          <a href={detailUrl(d.id)}>{a.title}</a>
+                          <a href={detailUrl(dev.id)}>{t.title}</a>
                         </h3>
-                        <a className="mono device-link" href={detailUrl(d.id)}>
-                          {d.domain} ↗
+                        <a
+                          className="mono device-link"
+                          href={detailUrl(dev.id)}
+                        >
+                          {dev.name} ({dev.domain}) ↗
                         </a>
-                        <p>Assigned to {d.engineers}</p>
+                        <p>
+                          {t.description} — Assigned to{" "}
+                          <strong>{dev.engineers}</strong>
+                        </p>
                         <div className="alert-actions">
-                          <a className="text-link" href={detailUrl(d.id)}>
-                            Investigate →
+                          <a className="text-link" href={detailUrl(dev.id)}>
+                            Troubleshoot device →
                           </a>
-                          {a.acknowledged ? (
-                            <span className="muted">✓ Acknowledged</span>
+                          {t.resolved ? (
+                            <span className="muted">✓ Closed</span>
                           ) : (
                             <button
                               className="button small"
@@ -315,22 +370,20 @@ export default function App() {
                                     {
                                       ...state,
                                       alerts: state.alerts.map((old) =>
-                                        old.id === a.id
-                                          ? { ...old, acknowledged: true }
+                                        old.id === t.id
+                                          ? { ...old, resolved: true }
                                           : old,
                                       ),
                                     },
-                                    d.id,
-                                    "Alert acknowledged · Matt",
-                                    a.title,
+                                    dev.id,
+                                    `Ticket #${t.id} closed · Matt`,
+                                    t.title,
                                   ),
                                 );
-                                setFlash(
-                                  "Alert acknowledged. The device status has not changed.",
-                                );
+                                setFlash(`Ticket #${t.id} marked as closed.`);
                               }}
                             >
-                              Acknowledge
+                              Close ticket
                             </button>
                           )}
                         </div>
@@ -342,37 +395,36 @@ export default function App() {
           </Panel>
           <div className="right-column">
             <Panel
-              title="Network health"
-              aside={<span className="muted">Inventory</span>}
+              title="Network status"
+              aside={<span className="muted">Online vs. offline</span>}
             >
               {networks.map((n) => {
                 const nd = state.devices.filter((d) => d.network === n);
-                const healthy = nd.filter((d) => d.status === "Online").length;
+                const online = nd.filter((d) => d.status === "Online").length;
+                const offline = nd.length - online;
                 return (
                   <a className="network-row" href={url("devices", n)} key={n}>
                     <div>
                       <strong>{n}</strong>
                       <span>
-                        {healthy}/{nd.length} online
+                        {online} online · {offline} offline
                       </span>
                     </div>
                     <progress
-                      value={healthy}
-                      max={nd.length}
-                      aria-label={n + " online devices"}
+                      value={online}
+                      max={Math.max(1, nd.length)}
+                      aria-label={`${n}: ${online} online, ${offline} offline`}
                     />
                   </a>
                 );
               })}
+              <div className="network-status-note muted">
+                Offline devices are expected during disconnected or field
+                operations.
+              </div>
               <a className="panel-link" href={url("topology")}>
                 Explore network topology ↗
               </a>
-            </Panel>
-            <Panel
-              title="Recent activity"
-              aside={<span className="live-dot" />}
-            >
-              {timeline(state.events.slice(-5), true)}
             </Panel>
           </div>
         </div>
@@ -384,7 +436,7 @@ export default function App() {
         <Heading
           eyebrow="INVENTORY"
           title="Network devices"
-          description="Manage addresses, monitor health, and find the engineer responsible."
+          description="Manage addresses, review open tickets, and find the engineer responsible."
         >
           <a className="button" href={url("import")}>
             ↥ Import Excel
@@ -394,7 +446,12 @@ export default function App() {
           </a>
         </Heading>
         {tabs("devices")}
-        <Inventory key={network} devices={inventory} network={network} />
+        <Inventory
+          key={network}
+          devices={inventory}
+          tickets={state.alerts}
+          network={network}
+        />
       </>
     );
   else if (path === "/devices/add")
@@ -518,28 +575,6 @@ export default function App() {
                 </dl>
               </Panel>
               <div className="right-column">
-                <section className="panel uptime">
-                  <div className="eyebrow">30-DAY UPTIME · SAMPLE DATA</div>
-                  <div className="uptime-number">
-                    {d.uptime?.toFixed(2) ?? "—"}
-                    <small>%</small>
-                  </div>
-                  <p>
-                    {d.uptime === null
-                      ? "No monitoring history yet"
-                      : d.uptime < 99.9
-                        ? "Below the 99.9% target"
-                        : "Meeting the 99.9% target"}
-                  </p>
-                  <progress
-                    value={d.uptime ?? 0}
-                    max={100}
-                    aria-label="30 day sample uptime"
-                  />
-                  <small className="muted">
-                    Historical sample; demo actions do not recalculate uptime.
-                  </small>
-                </section>
                 <Panel title="Assigned engineers">
                   {d.engineers.split(",").map((engineer, i) => (
                     <div className="engineer" key={i}>
@@ -626,8 +661,7 @@ export default function App() {
           aside={
             <div className="legend">
               <Badge value="Online" />
-              <Badge value="Down" />
-              <Badge value="Degraded" />
+              <Badge value="Online-Open-Ticket" />
             </div>
           }
         >
@@ -719,6 +753,7 @@ export default function App() {
         </a>
       </section>
     );
+
   return (
     <>
       <aside className="sidebar">
@@ -766,9 +801,13 @@ export default function App() {
             Field operations <span className="slash">/</span> {title}
           </div>
           <div className="top-right">
+            <span className={`enclave-indicator ${getClassificationClass(network)}`}>
+              <span className="enclave-dot" />
+              {network}
+            </span>
             <span className="demo-pill">DEMO ENVIRONMENT</span>
             <a href="#/">
-              Alerts <b>{alertCount}</b>
+              Tickets <b>{openTicketCount}</b>
             </a>
           </div>
         </header>
@@ -793,25 +832,35 @@ export default function App() {
     </>
   );
 }
+
 function Inventory({
   devices,
+  tickets,
   network,
 }: {
   devices: Device[];
+  tickets: Ticket[];
   network: string;
 }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [filter, setFilter] = useState({ q: "", status: "" });
-  const ds = devices.filter(
-    (d) =>
+
+  const ds = devices.filter((d) => {
+    const deviceTicketTitles = tickets
+      .filter((t) => t.deviceId === d.id && !t.resolved)
+      .map((t) => t.title)
+      .join(" ");
+    return (
       (!filter.status || d.status === filter.status) &&
       (!filter.q ||
-        [d.name, d.domain, d.ipv4, d.ipv6, d.engineers]
+        [d.name, d.domain, d.ipv4, d.ipv6, d.engineers, deviceTicketTitles]
           .join(" ")
           .toLowerCase()
-          .includes(filter.q.toLowerCase())),
-  );
+          .includes(filter.q.toLowerCase()))
+    );
+  });
+
   return (
     <Panel
       title={network}
@@ -834,7 +883,7 @@ function Inventory({
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name, IP address, or engineer…"
+            placeholder="Search name, IP, engineer, or ticket…"
           />
         </label>
         <label>
@@ -871,7 +920,7 @@ function Inventory({
                 "IPv4 address",
                 "IPv6 address",
                 "Assigned engineers",
-                "Health / errors",
+                "Tickets",
                 "",
               ].map((h, i) => (
                 <th key={i}>{h}</th>
@@ -879,28 +928,43 @@ function Inventory({
             </tr>
           </thead>
           <tbody>
-            {ds.map((d) => (
-              <tr key={d.id}>
-                <td>
-                  <a className="device-name" href={detailUrl(d.id)}>
-                    {d.name}
-                  </a>
-                  <small className="mono">{d.domain}</small>
-                </td>
-                <td>
-                  <Badge value={d.status} />
-                </td>
-                <td className="mono">{d.ipv4}</td>
-                <td className="mono">{d.ipv6 || "—"}</td>
-                <td>{d.engineers}</td>
-                <td className="error-cell">{d.error || "No active errors"}</td>
-                <td>
-                  <a href={detailUrl(d.id)} aria-label={"View " + d.name}>
-                    ↗
-                  </a>
-                </td>
-              </tr>
-            ))}
+            {ds.map((d) => {
+              const deviceTickets = tickets.filter(
+                (t) => t.deviceId === d.id && !t.resolved,
+              );
+              return (
+                <tr key={d.id}>
+                  <td>
+                    <a className="device-name" href={detailUrl(d.id)}>
+                      {d.name}
+                    </a>
+                    <small className="mono">{d.domain}</small>
+                  </td>
+                  <td>
+                    <Badge value={d.status} />
+                  </td>
+                  <td className="mono">{d.ipv4}</td>
+                  <td className="mono">{d.ipv6 || "—"}</td>
+                  <td>{d.engineers}</td>
+                  <td className="error-cell">
+                    {deviceTickets.length ? (
+                      <ul className="ticket-list">
+                        {deviceTickets.map((t) => (
+                          <li key={t.id}>{t.title}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      "No open tickets"
+                    )}
+                  </td>
+                  <td>
+                    <a href={detailUrl(d.id)} aria-label={"View " + d.name}>
+                      ↗
+                    </a>
+                  </td>
+                </tr>
+              );
+            })}
             {!ds.length && (
               <tr>
                 <td colSpan={7} className="empty">
@@ -918,6 +982,7 @@ function Inventory({
     </Panel>
   );
 }
+
 function AddDevice({
   network,
   networks,
@@ -975,6 +1040,7 @@ function AddDevice({
     </form>
   );
 }
+
 function ImportInventory({
   onImport,
 }: {
@@ -982,6 +1048,7 @@ function ImportInventory({
 }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
   async function upload(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -1031,6 +1098,7 @@ function ImportInventory({
       setBusy(false);
     }
   }
+
   return (
     <>
       <Heading
