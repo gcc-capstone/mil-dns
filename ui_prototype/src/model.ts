@@ -1,6 +1,8 @@
 import ipaddr from "ipaddr.js";
 import seed from "./seed.json";
-export type Status = "Online" | "Down" | "Degraded" | "Unknown";
+
+export type Status = "Online" | "Offline" | "Online-Open-Ticket" | "Unknown";
+
 export interface Device {
   id: number;
   name: string;
@@ -17,6 +19,7 @@ export interface Device {
   error: string;
   downtime: string;
 }
+
 export interface Event {
   id: number;
   deviceId: number;
@@ -24,19 +27,30 @@ export interface Event {
   title: string;
   detail: string;
 }
-export interface Alert {
+
+export interface Ticket {
   id: number;
   deviceId: number;
   title: string;
-  severity: "Critical" | "Warning";
-  acknowledged: boolean;
+  description: string;
+  priority: "High" | "Normal";
+  resolved: boolean;
 }
+
 export interface State {
-  version: 1;
+  version: 2;
   devices: Device[];
   events: Event[];
-  alerts: Alert[];
+  alerts: Ticket[];
 }
+
+export const DEFAULT_NETWORKS = [
+  "Unclassified",
+  "Confidential",
+  "Secret",
+  "Top Secret",
+] as const;
+
 export const fields = [
   "name",
   "domain",
@@ -48,7 +62,9 @@ export const fields = [
   "location",
   "parent",
 ] as const;
+
 export type Draft = Record<(typeof fields)[number], string>;
+
 export const labels: Record<keyof Draft, string> = {
   name: "Device name",
   domain: "Domain name",
@@ -60,34 +76,44 @@ export const labels: Record<keyof Draft, string> = {
   location: "Location",
   parent: "Upstream domain (optional)",
 };
+
 export function now() {
   return new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC";
 }
+
+function mapSeedNetworks(rawDevices: Device[]): Device[] {
+  const legacyNetworks = [...new Set(rawDevices.map((d) => d.network))];
+  return rawDevices.map((d, index) => {
+    if (
+      DEFAULT_NETWORKS.includes(
+        d.network as (typeof DEFAULT_NETWORKS)[number],
+      )
+    ) {
+      return d;
+    }
+    const netIndex = legacyNetworks.indexOf(d.network);
+    const mappedNetwork =
+      DEFAULT_NETWORKS[
+        (netIndex >= 0 ? netIndex : index) % DEFAULT_NETWORKS.length
+      ];
+    return { ...d, network: mappedNetwork };
+  });
+}
+
 export function initialState(): State {
+  const devices = mapSeedNetworks(structuredClone(seed) as Device[]);
   return {
-    version: 1,
-    devices: structuredClone(seed) as Device[],
+    version: 2,
+    devices,
     alerts: [
       {
-        id: 1,
-        deviceId: 4,
-        title: "High-value server is unreachable",
-        severity: "Critical",
-        acknowledged: false,
-      },
-      {
-        id: 2,
-        deviceId: 5,
-        title: "East sector connectivity lost",
-        severity: "Critical",
-        acknowledged: false,
-      },
-      {
-        id: 3,
+        id: 103,
         deviceId: 8,
-        title: "Packet loss above threshold",
-        severity: "Warning",
-        acknowledged: false,
+        title: "Troubleshoot elevated latency on uplink interface",
+        description:
+          "Check duplex mismatch and physical transceiver diagnostics.",
+        priority: "Normal",
+        resolved: false,
       },
     ],
     events: [
@@ -95,36 +121,38 @@ export function initialState(): State {
         id: 1,
         deviceId: 4,
         time: now(),
-        title: "Health check failed",
+        title: "Ticket #101 opened",
         detail:
-          "No response from operations server. Tim was notified in this demo; acknowledgement pending.",
+          "Ticket assigned to network engineers to investigate DNS timeout on operations server.",
       },
       {
         id: 2,
         deviceId: 5,
         time: now(),
-        title: "Correlated outage detected",
+        title: "Ticket #102 opened",
         detail:
-          "Router and two downstream devices are unreachable. Possible shared failure point.",
+          "Router trunk port configuration check queued for assigned field engineers.",
       },
       {
         id: 3,
         deviceId: 6,
         time: now(),
-        title: "Previous incident resolved",
+        title: "Previous ticket resolved",
         detail:
-          "James diagnosed a stalled service and reset the server. Previous downtime: 46 minutes. Current outage is a separate event.",
+          "James diagnosed a stalled service and reset the server. Previous downtime: 46 minutes.",
       },
       {
         id: 4,
-        deviceId: 6,
+        deviceId: 8,
         time: now(),
-        title: "Current outage detected",
-        detail: "Device unreachable after east sector router went down.",
+        title: "Ticket #103 opened",
+        detail:
+          "Engineers requested to inspect uplink interface for elevated latency.",
       },
     ],
   };
 }
+
 export function addEvent(
   s: State,
   deviceId: number,
@@ -145,6 +173,7 @@ export function addEvent(
     ],
   };
 }
+
 export function validate(row: Partial<Draft>, existing: Device[]): Draft {
   const d = Object.fromEntries(
     fields.map((k) => [k, String(row[k] ?? "").trim()]),
@@ -183,6 +212,7 @@ export function validate(row: Partial<Draft>, existing: Device[]): Draft {
   d.engineers ||= "Unassigned";
   return d;
 }
+
 export function importRows(state: State, rows: Partial<Draft>[]): State {
   if (!rows.length) throw new Error("Workbook has no device rows");
   if (rows.length > 1000)
@@ -213,30 +243,38 @@ export function importRows(state: State, rows: Partial<Draft>[]): State {
   }
   return next;
 }
+
 export function ping(status: Status) {
   return {
     Online: "4 packets sent, 4 received · 0% loss · average 2.4 ms",
-    Degraded: "4 packets sent, 3 received · 25% loss · average 142 ms",
-    Down: "4 packets sent, 0 received · 100% loss · request timed out",
+    "Online-Open-Ticket": "4 packets sent, 4 received · 0% loss · average 2.4 ms",
+    Offline: "4 packets sent, 0 received · 100% loss · request timed out",
     Unknown: "No monitoring baseline. Simulated probe result unavailable.",
   }[status];
 }
+
 export function topology(devices: Device[]) {
-  const byDomain = new Map(devices.map((d) => [d.domain, d]));
+  // Exclude offline/down devices from the topology map
+  const activeDevices = devices.filter((d) => d.status !== "Offline");
+  const byDomain = new Map(activeDevices.map((d) => [d.domain, d]));
+  
   function depth(d: Device, seen = new Set<string>()): number {
     if (seen.has(d.domain)) return 0;
     const p = byDomain.get(d.parent);
     return p ? Math.min(8, 1 + depth(p, new Set([...seen, d.domain]))) : 0;
   }
+
   const levels = new Map<number, Device[]>();
-  devices.forEach((d) => {
+  activeDevices.forEach((d) => {
     const level = depth(d);
     levels.set(level, [...(levels.get(level) ?? []), d]);
   });
+
   const width = Math.max(
     960,
     ...[...levels.values()].map((v) => v.length * 240 + 60),
   );
+
   const nodes = [...levels].flatMap(([level, ds]) =>
     ds.map((d, i) => ({
       ...d,
@@ -244,7 +282,9 @@ export function topology(devices: Device[]) {
       y: 65 + level * 155,
     })),
   );
+
   const positioned = new Map(nodes.map((d) => [d.domain, d]));
+
   return {
     nodes,
     width,
