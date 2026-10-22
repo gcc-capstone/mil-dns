@@ -7,13 +7,13 @@
   --red: #c94a4a;
   --amber: #b27a19;
   --nav: #112b39;
-  --class-unclass: #228b22;       /* Forest Green (SF 710) */
+  --class-unclass: #228b22; /* Forest Green (SF 710) */
   --class-unclass-bg: #edf7ed;
-  --class-confidential: #1565c0;  /* Royal Blue (SF 708) */
+  --class-confidential: #1565c0; /* Royal Blue (SF 708) */
   --class-confidential-bg: #eaf1fb;
-  --class-secret: #c62828;        /* Signal Red (SF 707) */
+  --class-secret: #c62828; /* Signal Red (SF 707) */
   --class-secret-bg: #fbebeb;
-  --class-topsecret: #e65100;     /* Vivid Orange (SF 706) */
+  --class-topsecret: #e65100; /* Vivid Orange (SF 706) */
   --class-topsecret-bg: #fff1e5;
 }
 * {
@@ -604,10 +604,18 @@ footer {
   display: inline-block;
   flex-shrink: 0;
 }
-.network-tabs a.net-unclassified .tab-dot { background-color: var(--class-unclass); }
-.network-tabs a.net-confidential .tab-dot { background-color: var(--class-confidential); }
-.network-tabs a.net-secret .tab-dot { background-color: var(--class-secret); }
-.network-tabs a.net-top-secret .tab-dot { background-color: var(--class-topsecret); }
+.network-tabs a.net-unclassified .tab-dot {
+  background-color: var(--class-unclass);
+}
+.network-tabs a.net-confidential .tab-dot {
+  background-color: var(--class-confidential);
+}
+.network-tabs a.net-secret .tab-dot {
+  background-color: var(--class-secret);
+}
+.network-tabs a.net-top-secret .tab-dot {
+  background-color: var(--class-topsecret);
+}
 .network-tabs a.selected.net-unclassified {
   color: var(--class-unclass);
   border-bottom-color: var(--class-unclass);
@@ -689,28 +697,36 @@ footer {
   color: var(--class-unclass);
   border: 1px solid #c2e2c9;
 }
-.enclave-indicator.unclassified .enclave-dot { background: var(--class-unclass); }
+.enclave-indicator.unclassified .enclave-dot {
+  background: var(--class-unclass);
+}
 
 .enclave-indicator.confidential {
   background: var(--class-confidential-bg);
   color: var(--class-confidential);
   border: 1px solid #b8daff;
 }
-.enclave-indicator.confidential .enclave-dot { background: var(--class-confidential); }
+.enclave-indicator.confidential .enclave-dot {
+  background: var(--class-confidential);
+}
 
 .enclave-indicator.secret {
   background: var(--class-secret-bg);
   color: var(--class-secret);
   border: 1px solid #f5c6cb;
 }
-.enclave-indicator.secret .enclave-dot { background: var(--class-secret); }
+.enclave-indicator.secret .enclave-dot {
+  background: var(--class-secret);
+}
 
 .enclave-indicator.top-secret {
   background: var(--class-topsecret-bg);
   color: var(--class-topsecret);
   border: 1px solid #ffe0b2;
 }
-.enclave-indicator.top-secret .enclave-dot { background: var(--class-topsecret); }
+.enclave-indicator.top-secret .enclave-dot {
+  background: var(--class-topsecret);
+}
 .filters {
   display: flex;
   gap: 10px;
@@ -1268,4 +1284,87 @@ dd {
   .legend {
     display: none;
   }
+}
+
+/* Ticket workflow additions retain the existing console theme. */
+.role-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.role-switch select {
+  width: 190px;
+  min-width: 0;
+  padding: 7px 9px;
+}
+.ticket-quick-actions {
+  margin-bottom: 24px;
+}
+.form-grid select,
+.form-grid textarea {
+  display: block;
+  margin-top: 7px;
+}
+.full-width {
+  grid-column: 1 / -1;
+}
+.registration-fields {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px;
+  margin: 22px 0;
+}
+.registration-fields legend {
+  font-weight: 600;
+  padding: 0 6px;
+}
+.ticket-tags {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 20px;
+  font-size: 12px;
+}
+.preserve-lines {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1150px) {
+  .topbar {
+    height: auto;
+    min-height: 76px;
+    flex-wrap: wrap;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    gap: 12px;
+  }
+  .top-right {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
+@media (max-width: 540px) {
+  .role-switch select {
+    width: 180px;
+  }
+  .top-right .enclave-indicator {
+    display: none;
+  }
+  .ticket-tags {
+    flex-wrap: wrap;
+  }
+  .registration-fields {
+    padding: 14px;
+  }
+}
+.export-panel {
+  margin-bottom: 24px;
+}
+.export-panel label {
+  font-size: 12px;
+}
+.export-panel select {
+  display: block;
+  min-width: 210px;
 }
