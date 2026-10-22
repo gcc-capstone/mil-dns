@@ -982,7 +982,6 @@ function Inventory({
     </Panel>
   );
 }
-
 function AddDevice({
   network,
   networks,
@@ -993,6 +992,18 @@ function AddDevice({
   onAdd: (draft: Draft) => void;
 }) {
   const [error, setError] = useState("");
+
+  // Map fields to their grey placeholder text
+  const placeholders: Partial<Record<keyof Draft, string>> = {
+    name: "e.g., Operations server",
+    domain: "e.g., ops-01.unclass.test",
+    ipv4: "e.g., 10.20.0.12",
+    ipv6: "e.g., fd20::12",
+    engineers: "e.g., Tim, Cole",
+    location: "e.g., Command center",
+    parent: "e.g., gateway-01.unclass.test",
+  };
+
   return (
     <form
       onSubmit={(e) => {
@@ -1013,23 +1024,27 @@ function AddDevice({
         {fields.map((f) => (
           <label key={f}>
             {labels[f]}
-            <input
-              name={f}
-              defaultValue={f === "network" ? network : ""}
-              maxLength={255}
-              required={["name", "domain", "ipv4", "network"].includes(f)}
-              list={f === "network" ? "network-list" : undefined}
-            />
+            {f === "network" ? (
+              <select name={f} defaultValue={network} required>
+                {networks.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                name={f}
+                placeholder={placeholders[f]}
+                maxLength={255}
+                required={["name", "domain", "ipv4"].includes(f)}
+              />
+            )}
           </label>
         ))}
       </div>
-      <datalist id="network-list">
-        {networks.map((n) => (
-          <option key={n} value={n} />
-        ))}
-      </datalist>
       <p className="muted">
-        Separate engineers with commas. A new network name creates a new tab.
+        Separate engineers with commas. Parent domains determine topology mapping.
       </p>
       <div className="actions">
         <button className="button primary">Create device</button>
