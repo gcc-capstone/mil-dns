@@ -30,15 +30,24 @@ export interface Event {
 
 export interface Ticket {
   id: number;
-  deviceId: number;
+  deviceId: number | null;
   title: string;
   description: string;
   priority: "High" | "Normal";
   resolved: boolean;
+  type: "Problem" | "Request" | "Device registration";
+  network: string;
+  createdBy: string;
+  createdAt: string;
+  closedBy: string | null;
+  closedAt: string | null;
+  resolution: string;
+  registration?: Draft;
+  history: { time: string; actor: string; text: string }[];
 }
 
 export interface State {
-  version: 2;
+  version: 3;
   devices: Device[];
   events: Event[];
   alerts: Ticket[];
@@ -85,9 +94,7 @@ function mapSeedNetworks(rawDevices: Device[]): Device[] {
   const legacyNetworks = [...new Set(rawDevices.map((d) => d.network))];
   return rawDevices.map((d, index) => {
     if (
-      DEFAULT_NETWORKS.includes(
-        d.network as (typeof DEFAULT_NETWORKS)[number],
-      )
+      DEFAULT_NETWORKS.includes(d.network as (typeof DEFAULT_NETWORKS)[number])
     ) {
       return d;
     }
@@ -103,7 +110,7 @@ function mapSeedNetworks(rawDevices: Device[]): Device[] {
 export function initialState(): State {
   const devices = mapSeedNetworks(structuredClone(seed) as Device[]);
   return {
-    version: 2,
+    version: 3,
     devices,
     alerts: [
       {
@@ -114,6 +121,14 @@ export function initialState(): State {
           "Check duplex mismatch and physical transceiver diagnostics.",
         priority: "Normal",
         resolved: false,
+        type: "Problem",
+        network: devices.find((d) => d.id === 8)!.network,
+        createdBy: "Veronica",
+        createdAt: now(),
+        closedBy: null,
+        closedAt: null,
+        resolution: "",
+        history: [{ time: now(), actor: "Veronica", text: "Ticket opened" }],
       },
     ],
     events: [
@@ -247,7 +262,8 @@ export function importRows(state: State, rows: Partial<Draft>[]): State {
 export function ping(status: Status) {
   return {
     Online: "4 packets sent, 4 received · 0% loss · average 2.4 ms",
-    "Online-Open-Ticket": "4 packets sent, 4 received · 0% loss · average 2.4 ms",
+    "Online-Open-Ticket":
+      "4 packets sent, 4 received · 0% loss · average 2.4 ms",
     Offline: "4 packets sent, 0 received · 100% loss · request timed out",
     Unknown: "No monitoring baseline. Simulated probe result unavailable.",
   }[status];
@@ -257,7 +273,7 @@ export function topology(devices: Device[]) {
   // Exclude offline/down devices from the topology map
   const activeDevices = devices.filter((d) => d.status !== "Offline");
   const byDomain = new Map(activeDevices.map((d) => [d.domain, d]));
-  
+
   function depth(d: Device, seen = new Set<string>()): number {
     if (seen.has(d.domain)) return 0;
     const p = byDomain.get(d.parent);
@@ -305,4 +321,175 @@ export function topology(devices: Device[]) {
         : [];
     }),
   };
+}
+
+export type Role = "admin" | "user";
+export const DEMO_USERS = {
+  admin: { name: "Matt", role: "admin" as Role },
+  user: { name: "Veronica", role: "user" as Role },
+};
+export type Actor = (typeof DEMO_USERS)[Role];
+export type TicketInput = Pick<
+  Ticket,
+  "title" | "description" | "priority" | "type" | "network" | "deviceId"
+> & { registration?: Partial<Draft> };
+export function syncTicketStatus(state: State): State {
+  return {
+    ...state,
+    devices: state.devices.map((d) => {
+      if (d.status !== "Online" && d.status !== "Online-Open-Ticket") return d;
+      const open = state.alerts.some((t) => t.deviceId === d.id && !t.resolved);
+      return { ...d, status: open ? "Online-Open-Ticket" : "Online" };
+    }),
+  };
+}
+export function migrateState(data: unknown): State {
+  const s = data as State;
+  if (
+    !s ||
+    ![2, 3].includes(s.version) ||
+    !Array.isArray(s.devices) ||
+    !Array.isArray(s.events) ||
+    !Array.isArray(s.alerts)
+  )
+    throw new Error("Unsupported demo data");
+  return syncTicketStatus({
+    ...s,
+    version: 3,
+    alerts: s.alerts.map((t) => ({
+      ...t,
+      type: t.type || "Problem",
+      network:
+        t.network ||
+        s.devices.find((d) => d.id === t.deviceId)?.network ||
+        "Unclassified",
+      createdBy: t.createdBy || "Legacy demo",
+      createdAt: t.createdAt || "Not recorded",
+      closedBy: t.closedBy || null,
+      closedAt: t.closedAt || null,
+      resolution: t.resolution || "",
+      history: t.history || [
+        {
+          time: now(),
+          actor: "System",
+          text: "Existing ticket migrated; original timestamps not recorded.",
+        },
+      ],
+    })),
+  });
+}
+export function openTicket(
+  state: State,
+  actor: Actor,
+  input: TicketInput,
+): State {
+  const title = input.title.trim(),
+    description = input.description.trim();
+  if (!title || title.length > 160)
+    throw new Error("Enter a title of 1–160 characters.");
+  if (!description || description.length > 4000)
+    throw new Error("Enter details of 1–4,000 characters.");
+  if (
+    !["Problem", "Request", "Device registration"].includes(input.type) ||
+    !["High", "Normal"].includes(input.priority)
+  )
+    throw new Error("Invalid ticket type or priority.");
+  if (!input.network.trim()) throw new Error("Select a network.");
+  const device = state.devices.find((d) => d.id === input.deviceId);
+  if (input.deviceId !== null && (!device || device.network !== input.network))
+    throw new Error("Select a device in the chosen network.");
+  const registration =
+    input.type === "Device registration"
+      ? validate(
+          { ...input.registration, network: input.network },
+          state.devices,
+        )
+      : undefined;
+  const id = Math.max(100, ...state.alerts.map((t) => t.id)) + 1;
+  const ticket: Ticket = {
+    ...input,
+    title,
+    description,
+    deviceId: registration ? null : input.deviceId,
+    id,
+    registration,
+    resolved: false,
+    createdBy: actor.name,
+    createdAt: now(),
+    closedBy: null,
+    closedAt: null,
+    resolution: "",
+    history: [{ time: now(), actor: actor.name, text: "Ticket opened" }],
+  };
+  let next = { ...state, alerts: [...state.alerts, ticket] };
+  if (ticket.deviceId !== null)
+    next = addEvent(
+      next,
+      ticket.deviceId,
+      `Ticket #${id} opened · ${actor.name}`,
+      title,
+    );
+  return syncTicketStatus(next);
+}
+export function finishTicket(
+  state: State,
+  actor: Actor,
+  id: number,
+  resolution: string,
+  approve = false,
+  edited?: Partial<Draft>,
+): State {
+  if (actor.role !== "admin")
+    throw new Error("Only an admin can close or approve tickets.");
+  const t = state.alerts.find((t) => t.id === id);
+  if (!t || t.resolved) throw new Error("Ticket is missing or already closed.");
+  const note = resolution.trim();
+  if (!note || note.length > 4000)
+    throw new Error("Enter a resolution of 1–4,000 characters.");
+  let next = state,
+    deviceId = t.deviceId,
+    registration = t.registration;
+  if (approve) {
+    if (t.type !== "Device registration" || !t.registration)
+      throw new Error("This ticket is not a device registration.");
+    registration = validate(edited || t.registration, state.devices);
+    next = importRows(state, [registration]);
+    deviceId = next.devices.at(-1)!.id;
+  }
+  next = {
+    ...next,
+    alerts: next.alerts.map((old) =>
+      old.id === id
+        ? {
+            ...old,
+            registration,
+            network: registration?.network || old.network,
+            deviceId,
+            resolved: true,
+            closedBy: actor.name,
+            closedAt: now(),
+            resolution: note,
+            history: [
+              ...old.history,
+              {
+                time: now(),
+                actor: actor.name,
+                text:
+                  (approve
+                    ? "Registration approved and device added. "
+                    : "Ticket closed. ") + note,
+              },
+            ],
+          }
+        : old,
+    ),
+  };
+  if (deviceId !== null)
+    next = addEvent(
+      next,
+      deviceId,
+      `Ticket #${id} ${approve ? "approved" : "closed"} · ${actor.name}`,
+      note,
+    );
+  return syncTicketStatus(next);
 }

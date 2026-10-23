@@ -1,6 +1,12 @@
+import { exportWorkbook } from "./inventory-export";
+import { Tickets, ticketUrl } from "./Tickets";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   addEvent,
+  migrateState,
+  DEMO_USERS,
+  syncTicketStatus,
+  type Role,
   DEFAULT_NETWORKS,
   fields,
   labels,
@@ -15,13 +21,18 @@ import {
   type Ticket,
 } from "./model";
 
-const STORAGE = "fdns-react-demo-v2";
+const STORAGE = "fdns-react-demo-v3";
 
 const url = (page: string, network?: string) =>
   `#/${page}${network ? "?network=" + encodeURIComponent(network) : ""}`;
 const detailUrl = (id: number, tab = "overview") =>
   `#/devices/${id}?tab=${tab}`;
-const statuses: Status[] = ["Online", "Offline", "Online-Open-Ticket", "Unknown"];
+const statuses: Status[] = [
+  "Online",
+  "Offline",
+  "Online-Open-Ticket",
+  "Unknown",
+];
 
 function getClassificationClass(networkName: string) {
   const norm = networkName.trim().toLowerCase();
@@ -86,21 +97,28 @@ function Panel({
 
 function getStored(): State {
   try {
-    const data = JSON.parse(localStorage.getItem(STORAGE) || "null");
-    if (
-      data?.version === 2 &&
-      Array.isArray(data.devices) &&
-      Array.isArray(data.events) &&
-      Array.isArray(data.alerts)
-    )
-      return data;
+    const raw =
+      localStorage.getItem(STORAGE) ||
+      localStorage.getItem("fdns-react-demo-v2");
+    if (raw) return migrateState(JSON.parse(raw));
   } catch {
     /* Storage unavailable: use in-memory demo. */
   }
-  return initialState();
+  return syncTicketStatus(initialState());
 }
 
 export default function App() {
+  const [role, setRole] = useState<Role>(() => {
+    try {
+      return localStorage.getItem("fdns-demo-role") === "user"
+        ? "user"
+        : "admin";
+    } catch {
+      return "admin";
+    }
+  });
+  const actor = DEMO_USERS[role];
+  const isAdmin = role === "admin";
   const [state, setState] = useState<State>(getStored);
   const [hash, setHash] = useState(location.hash || "#/");
   const [flash, setFlash] = useState("");
@@ -133,12 +151,8 @@ export default function App() {
   const networks = [
     ...new Set([...DEFAULT_NETWORKS, ...state.devices.map((d) => d.network)]),
   ].sort((a, b) => {
-    const ia = DEFAULT_NETWORKS.indexOf(
-      a as (typeof DEFAULT_NETWORKS)[number],
-    );
-    const ib = DEFAULT_NETWORKS.indexOf(
-      b as (typeof DEFAULT_NETWORKS)[number],
-    );
+    const ia = DEFAULT_NETWORKS.indexOf(a as (typeof DEFAULT_NETWORKS)[number]);
+    const ib = DEFAULT_NETWORKS.indexOf(b as (typeof DEFAULT_NETWORKS)[number]);
     if (ia !== -1 && ib !== -1) return ia - ib;
     if (ia !== -1) return -1;
     if (ib !== -1) return 1;
@@ -147,32 +161,42 @@ export default function App() {
 
   const network = params.get("network") || networks[0] || "Unclassified";
 
-  const page = path.startsWith("/devices")
-    ? "devices"
-    : path === "/topology"
-      ? "topology"
-      : path === "/import"
-        ? "import"
-        : "home";
+  const page = path.startsWith("/tickets")
+    ? "tickets"
+    : path.startsWith("/devices")
+      ? "devices"
+      : path === "/topology"
+        ? "topology"
+        : path === "/import"
+          ? "import"
+          : "home";
 
   const d = state.devices.find((d) => path === `/devices/${d.id}`);
-  const title = d
-    ? d.name
-    : path === "/devices/add"
-      ? "Add device"
-      : page === "devices"
-        ? "Network inventory"
-        : page === "topology"
-          ? "Network topology"
-          : page === "import"
-            ? "Import inventory"
-            : "Operations overview";
+  const title =
+    page === "tickets"
+      ? isAdmin
+        ? "Ticket queue"
+        : "My tickets"
+      : d
+        ? d.name
+        : path === "/devices/add"
+          ? "Add device"
+          : page === "devices"
+            ? "Network inventory"
+            : page === "topology"
+              ? "Network topology"
+              : page === "import"
+                ? "Upload & export"
+                : "Operations overview";
 
   useEffect(() => {
     document.title = title + " · f-dns";
   }, [title]);
 
-  const openTicketCount = state.alerts.filter((t) => !t.resolved).length;
+  const visibleTickets = state.alerts.filter(
+    (t) => isAdmin || t.createdBy === actor.name,
+  );
+  const openTicketCount = visibleTickets.filter((t) => !t.resolved).length;
 
   function tabs(endpoint: string) {
     return (
@@ -195,11 +219,20 @@ export default function App() {
   }
 
   function action(kind: string, device: Device, note = "") {
+    if (kind === "resolve" && !isAdmin) {
+      setFlash("Only an admin can record recovery.");
+      return;
+    }
     let next = state;
     let message = "";
     if (kind === "ping") {
       message = ping(device.status);
-      next = addEvent(state, device.id, "Simulated ping · Matt", message);
+      next = addEvent(
+        state,
+        device.id,
+        `Simulated ping · ${actor.name}`,
+        message,
+      );
     }
     if (kind === "notify") {
       message = "Demo notification recorded for " + device.engineers + ".";
@@ -213,10 +246,16 @@ export default function App() {
     if (kind === "note") {
       if (!note.trim()) return;
       message = "Diagnosis added to the audit trail.";
-      next = addEvent(state, device.id, "Engineer note · Matt", note.trim());
+      next = addEvent(
+        state,
+        device.id,
+        `Engineer note · ${actor.name}`,
+        note.trim(),
+      );
     }
     if (kind === "resolve") {
-      message = "Device marked online and open tickets resolved.";
+      message =
+        "Device marked online. Tickets remain open until an admin resolves them.";
       next = addEvent(
         {
           ...state,
@@ -225,16 +264,13 @@ export default function App() {
               ? { ...d, status: "Online", error: "", downtime: "—" }
               : d,
           ),
-          alerts: state.alerts.map((t) =>
-            t.deviceId === device.id ? { ...t, resolved: true } : t,
-          ),
         },
         device.id,
         "Demo recovery recorded",
         `Previous reported downtime: ${device.downtime}. Device marked online manually; no real reset performed. Historical uptime remains unchanged.`,
       );
     }
-    setState(next);
+    setState(syncTicketStatus(next));
     const nextHash = detailUrl(device.id, "metadata");
     history.replaceState(null, "", nextHash);
     setHash(nextHash);
@@ -273,12 +309,24 @@ export default function App() {
         <Heading
           eyebrow="NETWORK OPERATIONS"
           title="Operations overview"
-          description="Your networks at a glance. Track engineer tickets and monitor network inventory."
+          description="Bring arriving devices onto your enclosed network. Review requests and maintain connectivity as the network changes."
         >
           <a className="button primary" href={url("devices")}>
             View devices ↗
           </a>
         </Heading>
+        <div className="actions ticket-quick-actions">
+          <a className="button primary" href="#/tickets/new">
+            ＋ Open ticket
+          </a>
+          <a className="button" href="#/tickets/new?type=registration">
+            Request device registration
+          </a>
+          <a className="button" href="#/tickets">
+            {isAdmin ? "Review ticket queue" : "My tickets"} · {openTicketCount}{" "}
+            open
+          </a>
+        </div>
         <div className="stats">
           {[
             [
@@ -288,14 +336,12 @@ export default function App() {
             ],
             [
               "Online",
-              state.devices.filter((d) => d.status === "Online").length,
+              state.devices.filter((d) =>
+                ["Online", "Online-Open-Ticket"].includes(d.status),
+              ).length,
               "Responding normally",
             ],
-            [
-              "Open tickets",
-              openTicketCount,
-              "Assigned to network engineers",
-            ],
+            ["Open tickets", openTicketCount, "Assigned to network engineers"],
           ].map(([name, count, note]) => (
             <article key={name}>
               <span>{name}</span>
@@ -310,87 +356,42 @@ export default function App() {
             aside={<span className="count">{openTicketCount}</span>}
           >
             <div id="alerts">
-              {[...state.alerts]
-                .sort((a, b) => Number(a.resolved) - Number(b.resolved))
-                .map((t) => {
-                  const dev = state.devices.find((d) => d.id === t.deviceId);
-                  if (!dev) return null;
-                  return (
-                    <article
-                      key={t.id}
-                      className={
-                        "alert-card " + (t.resolved ? "acknowledged" : "")
-                      }
-                    >
-                      <div
-                        className={
-                          "alert-icon " +
-                          (t.priority === "Normal" ? "warning" : "")
-                        }
-                      >
-                        #
+              {visibleTickets
+                .filter((t) => !t.resolved)
+                .slice()
+                .reverse()
+                .slice(0, 5)
+                .map((t) => (
+                  <article className="alert-card" key={t.id}>
+                    <div className="alert-icon">#</div>
+                    <div className="alert-body">
+                      <div className="alert-top">
+                        <span className="severity">
+                          Ticket #{t.id} · {t.priority}
+                        </span>
+                        <span className="muted">{t.network}</span>
                       </div>
-                      <div className="alert-body">
-                        <div className="alert-top">
-                          <span
-                            className={
-                              "severity " +
-                              (t.priority === "Normal" ? "warning" : "")
-                            }
-                          >
-                            Ticket #{t.id} · {t.priority} priority
-                          </span>
-                          <span className="muted">{dev.network}</span>
-                        </div>
-                        <h3>
-                          <a href={detailUrl(dev.id)}>{t.title}</a>
-                        </h3>
-                        <a
-                          className="mono device-link"
-                          href={detailUrl(dev.id)}
-                        >
-                          {dev.name} ({dev.domain}) ↗
+                      <h3>
+                        <a href={ticketUrl(t.id)}>{t.title}</a>
+                      </h3>
+                      <p>
+                        {t.type} · Requested by {t.createdBy}
+                      </p>
+                      <div className="alert-actions">
+                        <a className="text-link" href={ticketUrl(t.id)}>
+                          {isAdmin ? "Review ticket →" : "View ticket →"}
                         </a>
-                        <p>
-                          {t.description} — Assigned to{" "}
-                          <strong>{dev.engineers}</strong>
-                        </p>
-                        <div className="alert-actions">
-                          <a className="text-link" href={detailUrl(dev.id)}>
-                            Troubleshoot device →
-                          </a>
-                          {t.resolved ? (
-                            <span className="muted">✓ Closed</span>
-                          ) : (
-                            <button
-                              className="button small"
-                              onClick={() => {
-                                setState(
-                                  addEvent(
-                                    {
-                                      ...state,
-                                      alerts: state.alerts.map((old) =>
-                                        old.id === t.id
-                                          ? { ...old, resolved: true }
-                                          : old,
-                                      ),
-                                    },
-                                    dev.id,
-                                    `Ticket #${t.id} closed · Matt`,
-                                    t.title,
-                                  ),
-                                );
-                                setFlash(`Ticket #${t.id} marked as closed.`);
-                              }}
-                            >
-                              Close ticket
-                            </button>
-                          )}
-                        </div>
+                        <span className="status online-open-ticket">Open</span>
                       </div>
-                    </article>
-                  );
-                })}
+                    </div>
+                  </article>
+                ))}
+              {!openTicketCount && (
+                <div className="empty">No open tickets.</div>
+              )}
+              <a className="panel-link" href="#/tickets">
+                View all tickets ↗
+              </a>
             </div>
           </Panel>
           <div className="right-column">
@@ -400,14 +401,17 @@ export default function App() {
             >
               {networks.map((n) => {
                 const nd = state.devices.filter((d) => d.network === n);
-                const online = nd.filter((d) => d.status === "Online").length;
-                const offline = nd.length - online;
+                const online = nd.filter((d) =>
+                  ["Online", "Online-Open-Ticket"].includes(d.status),
+                ).length;
+                const offline = nd.filter((d) => d.status === "Offline").length;
+                const unknown = nd.filter((d) => d.status === "Unknown").length;
                 return (
                   <a className="network-row" href={url("devices", n)} key={n}>
                     <div>
                       <strong>{n}</strong>
                       <span>
-                        {online} online · {offline} offline
+                        {online} online · {offline} offline · {unknown} unknown
                       </span>
                     </div>
                     <progress
@@ -430,6 +434,37 @@ export default function App() {
         </div>
       </>
     );
+  else if (path.startsWith("/tickets"))
+    content = (
+      <Tickets
+        key={path + role + query}
+        state={state}
+        actor={actor}
+        path={path}
+        params={params}
+        networks={networks}
+        onChange={setState}
+      />
+    );
+  else if (!isAdmin && path === "/devices/add")
+    content = (
+      <section className="panel padded">
+        <h1>Admin action</h1>
+        <p>
+          Regular users request registration so an admin can review the device
+          before it enters inventory.
+        </p>
+        <a
+          className="button primary"
+          href={
+            "#/tickets/new?type=registration&network=" +
+            encodeURIComponent(network)
+          }
+        >
+          Request device registration
+        </a>
+      </section>
+    );
   else if (path === "/devices")
     content = (
       <>
@@ -439,10 +474,18 @@ export default function App() {
           description="Manage addresses, review open tickets, and find the engineer responsible."
         >
           <a className="button" href={url("import")}>
-            ↥ Import Excel
+            ↥ Upload & export
           </a>
-          <a className="button primary" href={url("devices/add", network)}>
-            ＋ Add device
+          <a
+            className="button primary"
+            href={
+              isAdmin
+                ? url("devices/add", network)
+                : "#/tickets/new?type=registration&network=" +
+                  encodeURIComponent(network)
+            }
+          >
+            {isAdmin ? "＋ Add device" : "＋ Request device"}
           </a>
         </Heading>
         {tabs("devices")}
@@ -470,6 +513,7 @@ export default function App() {
             network={network}
             networks={networks}
             onAdd={(draft) => {
+              if (!isAdmin) throw new Error("Admin access required");
               const next = importRows(state, [draft]);
               setState(next);
               location.hash = detailUrl(next.devices.at(-1)!.id);
@@ -494,6 +538,9 @@ export default function App() {
           }
           description={d.domain}
         >
+          <a className="button" href={"#/tickets/new?device=" + d.id}>
+            Open ticket
+          </a>
           <button className="button" onClick={() => action("notify", d)}>
             Notify engineers · demo
           </button>
@@ -628,14 +675,19 @@ export default function App() {
                   <button className="button primary">Save note</button>
                 </form>
                 <hr />
-                <h3>Simulate recovery</h3>
+                <h3>{isAdmin ? "Simulate recovery" : "Admin recovery"}</h3>
                 <p className="muted">
                   Record the current downtime and mark this device online.
                   Downstream devices remain unchanged.
                 </p>
-                <button className="button" onClick={() => action("resolve", d)}>
-                  Mark online · demo
-                </button>
+                {isAdmin && (
+                  <button
+                    className="button"
+                    onClick={() => action("resolve", d)}
+                  >
+                    Mark online · demo
+                  </button>
+                )}
               </section>
             </div>
           </section>
@@ -736,6 +788,7 @@ export default function App() {
   } else if (path === "/import")
     content = (
       <ImportInventory
+        devices={state.devices}
         onImport={(rows) => {
           const next = importRows(state, rows);
           setState(next);
@@ -770,8 +823,14 @@ export default function App() {
           {[
             ["home", "▦", "Overview", ""],
             ["devices", "▤", "Devices", "devices"],
+            [
+              "tickets",
+              "▧",
+              isAdmin ? "Ticket queue" : "My tickets",
+              "tickets",
+            ],
             ["topology", "⌘", "Topology", "topology"],
-            ["import", "↥", "Import inventory", "import"],
+            ["import", "↥", "Upload & export", "import"],
           ].map(([p, icon, label, route]) => (
             <a className={page === p ? "active" : ""} href={url(route)} key={p}>
               <span>{icon}</span>
@@ -788,10 +847,10 @@ export default function App() {
           </small>
         </div>
         <div className="profile">
-          <span className="avatar">MT</span>
+          <span className="avatar">{isAdmin ? "MT" : "VR"}</span>
           <div>
-            <strong>Matt</strong>
-            <small>Senior field engineer</small>
+            <strong>{actor.name}</strong>
+            <small>{isAdmin ? "Administrator" : "Regular user"}</small>
           </div>
         </div>
       </aside>
@@ -801,12 +860,34 @@ export default function App() {
             Field operations <span className="slash">/</span> {title}
           </div>
           <div className="top-right">
-            <span className={`enclave-indicator ${getClassificationClass(network)}`}>
+            <label className="role-switch">
+              <span>Demo user</span>
+              <select
+                aria-label="Demo user"
+                value={role}
+                onChange={(e) => {
+                  const next = e.target.value as Role;
+                  setRole(next);
+                  setFlash("");
+                  try {
+                    localStorage.setItem("fdns-demo-role", next);
+                  } catch {
+                    /* Session-only selection. */
+                  }
+                }}
+              >
+                <option value="admin">Matt (Admin)</option>
+                <option value="user">Veronica (Regular user)</option>
+              </select>
+            </label>
+            <span
+              className={`enclave-indicator ${getClassificationClass(network)}`}
+            >
               <span className="enclave-dot" />
               {network}
             </span>
             <span className="demo-pill">DEMO ENVIRONMENT</span>
-            <a href="#/">
+            <a href="#/tickets">
               Tickets <b>{openTicketCount}</b>
             </a>
           </div>
@@ -950,7 +1031,9 @@ function Inventory({
                     {deviceTickets.length ? (
                       <ul className="ticket-list">
                         {deviceTickets.map((t) => (
-                          <li key={t.id}>{t.title}</li>
+                          <li key={t.id}>
+                            <a href={ticketUrl(t.id)}>{t.title} ↗</a>
+                          </li>
                         ))}
                       </ul>
                     ) : (
@@ -1058,7 +1141,9 @@ function AddDevice({
 
 function ImportInventory({
   onImport,
+  devices,
 }: {
+  devices: Device[];
   onImport: (rows: Partial<Draft>[]) => void;
 }) {
   const [error, setError] = useState("");
@@ -1125,6 +1210,7 @@ function ImportInventory({
           ↓ Download Excel template
         </a>
       </Heading>
+      <ExportInventory devices={devices} />
       <div className="detail-grid">
         <section className="panel padded">
           <div className="upload-art">↥</div>
@@ -1185,5 +1271,71 @@ function ImportInventory({
         </section>
       </div>
     </>
+  );
+}
+
+function ExportInventory({ devices }: { devices: Device[] }) {
+  const [network, setNetwork] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const rows = devices.filter((d) => !network || d.network === network);
+  async function download() {
+    setBusy(true);
+    setError("");
+    try {
+      const bytes = await exportWorkbook(rows);
+      const blob = new Blob([new Uint8Array(bytes)], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = "fdns-inventory.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 1000);
+    } catch {
+      setError("Export failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel padded export-panel">
+      <h2>Export device inventory</h2>
+      <p className="muted">
+        Download device addresses and metadata for all networks or one selected
+        network.
+      </p>
+      {error && (
+        <div role="alert" className="flash error">
+          {error}
+        </div>
+      )}
+      <div className="actions">
+        <label>
+          Export network
+          <select
+            aria-label="Export network"
+            value={network}
+            onChange={(e) => setNetwork(e.target.value)}
+          >
+            <option value="">All networks</option>
+            {[...new Set(devices.map((d) => d.network))].map((n) => (
+              <option key={n}>{n}</option>
+            ))}
+          </select>
+        </label>
+        <button
+          className="button primary"
+          disabled={busy || !rows.length}
+          onClick={download}
+        >
+          {busy ? "Exporting…" : "↓ Export Excel"}
+        </button>
+        <span className="muted">{rows.length} devices</span>
+      </div>
+    </section>
   );
 }
