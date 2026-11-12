@@ -1,0 +1,74 @@
+enum grade {
+  E1
+  E2
+  E3
+  E4
+  E5
+  E6
+  E7
+  E8
+  E9
+  O1
+  O2
+  O3
+  O4
+  O5
+  O6
+  O7
+  O8
+  O9
+  O10
+  WO1
+  WO2
+  WO3
+  WO4
+  WO5
+}
+
+TablePartial user_partial {
+  name varchar
+  // Is a DODID a better primary key / ket
+  dodid integer [unique]
+  id integer [primary key]
+  grade grade
+}
+
+Table user {
+  ~user_partial
+}
+
+Table network_admin {
+  ~user_partial
+}
+
+Table ticket {
+  id integer [primary key]
+
+  // a ticket has one "owner" user, a user can have 0 to many tickets
+  // TODO: can a user account be deleted? what if this happens?
+  user_id integer [not null, ref: ?> user.id]
+
+  // a ticket can have 0 or 1 devices
+  device_id integer [ref: ?>? device.id]
+
+  // an admin need not be assigned to a ticket; a ticket can have 0 or 1 assigned admins
+  assigned_admin integer [ref: ?>? network_admin.id]
+
+  title varchar
+  description varchar
+}
+
+// Need to figure out the best way to store the ips
+// an ipv4 can be stored as an 8-digit hexadecimal string
+Table device {
+  id integer [primary key]
+  ipaddr_v4 ipv4 [not null]
+  ipaddr_v6 ipv6
+}
+
+Table device_user_assignment {
+  device_assigned integer [primary key, ref: <? device.id]
+  user_assigned integer [primary key, ref: <? user.id]
+}
+
+// Ref: user.
