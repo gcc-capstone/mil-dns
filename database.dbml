@@ -25,6 +25,30 @@ enum grade {
   WO5
 }
 
+enum status {
+  online
+  offline
+  "online - active ticket"
+}
+
+enum assigned_enginneers {
+  // The names of admins would be added to this enum as they are given accounts
+  placeholder_name
+}
+
+enum device_type {
+  laptop
+  phone
+  drone
+  switch
+}
+
+enum ticket_type {
+  problem
+  new_device
+  miscellaneous
+}
+
 TablePartial user_partial {
   name varchar
   // Is a DODID a better primary key / ket
@@ -55,15 +79,26 @@ Table ticket {
   assigned_admin integer [ref: ?>? network_admin.id]
 
   title varchar
+  ticket_type ticket_type
+  priority priority
   description varchar
+  time_created timestamp
+  resolution_note varchar
+  time_resolved timestamp
 }
 
 // Need to figure out the best way to store the ips
 // an ipv4 can be stored as an 8-digit hexadecimal string
 Table device {
   id integer [primary key]
+  device_name varchar
+  domain_name varchar [unique]
   ipaddr_v4 ipv4 [not null]
   ipaddr_v6 ipv6
+  status status
+  device_type device_type
+  location varchar 
+  upstream_domain varchar [ ref: ?>? device.domain_name]
 }
 
 Table device_user_assignment {
