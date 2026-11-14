@@ -123,5 +123,3 @@ Table domain_name {
   hostname varchar [primary key, unique]
   upstream_domain varchar [ref: ?- domain_name.hostname]
 }
-
-// Ref: user.
