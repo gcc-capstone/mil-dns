@@ -49,9 +49,15 @@ enum ticket_type {
   miscellaneous
 }
 
+enum priority {
+  urgent
+  preferred
+  routine
+}
+
 TablePartial user_partial {
   name varchar
-  // Is a DODID a better primary key / ket
+  // Is a DODID a better primary key / key
   dodid integer [unique]
   id integer [primary key]
   grade grade
@@ -82,28 +88,40 @@ Table ticket {
   ticket_type ticket_type
   priority priority
   description varchar
+
+  deadline timestamp
+
   time_created timestamp
+
   resolution_note varchar
   time_resolved timestamp
 }
 
 // Need to figure out the best way to store the ips
-// an ipv4 can be stored as an 8-digit hexadecimal string
+// an ipv4 can be stored as an 8-digit hexadecimal string (if we want?)
 Table device {
   id integer [primary key]
   device_name varchar
-  domain_name varchar [unique]
   ipaddr_v4 ipv4 [not null]
   ipaddr_v6 ipv6
   status status
   device_type device_type
   location varchar 
-  upstream_domain varchar [ ref: ?>? device.domain_name]
 }
 
+// Think of "assignment" in this context as more of a preference.
+// Soldiers on a network will be able to discover any device on
+// that network, so we are not implementing a strict form of access
+// control here.
 Table device_user_assignment {
   device_assigned integer [primary key, ref: <? device.id]
   user_assigned integer [primary key, ref: <? user.id]
+}
+
+Table domain_name {
+  device_id integer [ref: - device.id]
+  hostname varchar [primary key, unique]
+  upstream_domain varchar [ref: ?- domain_name.hostname]
 }
 
 // Ref: user.
