@@ -66,7 +66,51 @@ Although the software Infoblox creates has largely the same purpose as the produ
 Auvik [3] is a network monitoring platform that focuses on the live state of the network instead of managing IP addresses and DNS servers. Our product will be considerably different from Auvik because we are primarily interested in providing TurbineOne with an easily managed DNS server and network monitoring capabilities. However, Auvik does put a significant focus on network topology maps that allow users to see the network layout, network links, and the paths that network traffic flows through. This feature is not included in our MVP, but it is something that we hope to implement in some form after completing other basic aspects of our product. Because different devices in TurbineOne's networks will be mobile, we hope that our product will include a tool to visualize how the network links change as devices move. 
 
 ### Product 4 - CoreDNS
-CoreDNS [4] is a lightweight Go-based DNS server. The software is modularized into plugins, so users can choose different plugins based on individual use cases, which keeps CPU usage low. CoreDNS is open source and containerized, so it can be easily deployed with minimal setup time. Our product will strive to be similar to CoreDNS, but with a few added features such as an administrative dashboard and network monitoring. The architecture of our product is especially similar to CoreDNS because our software will be written in Go and deployable in a Docker container. 
+CoreDNS [4] is a lightweight Go-based DNS server. The software is modularized into plugins, so users can choose different plugins based on individual use cases, which keeps CPU usage low. CoreDNS is open source and containerized, so it can be easily deployed with minimal setup time. Our product will strive to be similar to CoreDNS, but with a few added features such as an administrative dashboard and network monitoring. The architecture of our product is especially similar to CoreDNS because our software will be written in Go and deployable in a Docker container.
+
+## Results from User Testing of UI Version 1.0
+
+### Testing Methods
+A total of nine people participated in the FDNS UI testing. Two computer science students, six other students, and Mr. Amacker, our client, completed the testing. The target audience will be a mix of technical and non-technical people, so we used a similar mix for user testing. We asked eight testers to add a device, and six testers to find their device on the topology map, as these are some of the most common tasks users will perform. Two testers were asked to import or export device information to or from an Excel spreadsheet. The two questions we asked each of our testers were: 1) How easy was it to accomplish this task on a scale of 1=difficult to 5=easy? and 2) Is there anything you would change to make it easier?
+
+### Results
+All eight testers were able to add a device. However, several of them were not familiar with computers and needed an example of what was supposed to go in each field. For example, when asked for an IPv4 address, we instructed them to enter ‘127.0.0.7’. The average time it took the testers to add a device was 1 minute and 4 seconds, with the fastest time being 52 seconds and the slowest being 1 minute and 27 seconds.
+
+All six testers were able to find their device in the topology quickly, without assistance. The average time it took the testers to find their device was 5 seconds, the fastest being 2 seconds, and the slowest being 8 seconds.
+
+Both testers were able to quickly find where to import their Excel sheet to FDNS without assistance. It took one tester 13 seconds to find it, and the other 6 seconds. Both testers were able to find where to export an Excel sheet without assistance, but it took significantly longer than expected. The first took 1 minute and 11 seconds, and it took the second 1 minute and 31 seconds to find the export button. Some unexpected behavior was that three of the users completely ignored the side bar and only utilized buttons on the main section of the page.
+
+On a scale of 1 being hardest and 5 being easiest, the testers reported an average of 4.3 on ease of use. However, two testers – notably including Mr. Amacker – returned a 3, one tester scored a 4, two other testers returned 4.5s, and the final four testers ranked the ease at 5. See the graph below.
+
+![UI Testing Graph](UITestingGraph.png)
+
+The suggestions we received were as follows:
+
+o	Give examples for the fields in the Add Device form
+
+o	Add an ‘Import Excel’ button next to the ‘View Devices’ button on the Overview page
+
+o	Choose a more accurate word than ‘template’ in ‘Download Excel template’ button
+
+o	Make the ‘Add Device’ button larger
+
+o	Choose a more descriptive word than ‘inventory’ or ‘Import Inventory’ on sidebar
+
+o	Make it clearer that the Importing Inventory page is also where a user can export to Excel
+
+o	Change the title of the Import Inventory page because it could be confused with Add Device
+
+o	Make it easier to select the names of responsible engineers in the Add Device form using a drop-down menu
+
+### Potential Improvements
+In our Add a Device task, the goal was to add a device to the network by finding the location of the form and completing it. Testers struggled with determining the proper formatting of the form fields, particularly IPv4 addresses. Therefore, we decided to add placeholder text to the fields to make it easier for users to know what information goes in which field.
+
+We are also considering changing the Assigned Engineers field in the Add a Device form from a text field to a dropdown menu so the user can reference the menu when assigning engineers to a device instead of slowing down to find and consult a separate list.
+
+Given that it took users longer than it should have to find where to export device information to Excel, we realized we need to relabel some tabs and buttons to make it clearer that they can export device information in the same location that they import it.
+
+
+
 
 ## Bibliography
 [1] SolarWinds Worldwide, LLC, "IP Address Manager (IPAM)," SolarWinds. Available: https://www.solarwinds.com/ip-address-manager/. [Accessed: Sep. 24, 2026].
