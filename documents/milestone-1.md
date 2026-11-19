@@ -1,5 +1,10 @@
 # Milestone 1
 ## Milestone 1 Functionality
+- Users will be able to add ipv4/hostname pairs which properly resolve when using the DNS server, which will also be functional.
+- Authentication is not a requirement; users on this version will be able to freely change which user they are simulating.
+- A prototyped ticket UI will be present which is linked to the backend and database.
+
+## Milestone 1 Tasks
 1. Choose language
 2. implement skeleton of architecture
 3. Choose a database (PostgreSQL, SQLite, RocksDB, other...)
